@@ -1,94 +1,73 @@
 import streamlit as st
 import pandas as pd
-import altair as alt
-import matplotlib.pyplot as plt
 import seaborn as sns
-from PIL import Image
+import matplotlib.pyplot as plt
 
-# Load datasets
-day_df = pd.read_csv('day.csv')
-hour_df = pd.read_csv('hour.csv')
+# Judul Dashboard
+st.title("Dashboard Penyewaan Sepeda")
 
-# Set page config untuk tampilan lebih profesional
-st.set_page_config(page_title="Dashboard Sepeda ", page_icon="🚴", layout="wide")
+# Deskripsi
+st.markdown("""
+Dashboard ini menganalisis pengaruh faktor cuaca (temperatur, kelembapan, dan kecepatan angin) terhadap jumlah penyewa sepeda dan 
+menunjukkan pola penyewaan sepeda berdasarkan waktu dan hari dalam seminggu.
+""")
 
-# Sidebar untuk filter
-st.sidebar.title("Filter Data")
-date_range = st.sidebar.date_input("Rentang Tanggal", [])
-weather_filter = st.sidebar.selectbox("Filter Berdasarkan Cuaca", day_df['weathersit'].unique())
+# Load Data
+day_df = pd.read_csv('day.csv')  # Ganti dengan data Anda
+hour_df = pd.read_csv('hour.csv')  # Ganti dengan data Anda
 
-# Load logo
-logo = Image.open("sepeda.jpeg")
-st.sidebar.image(logo, width=150)
+# 1. Analisis Korelasi antara Faktor Cuaca dan Jumlah Penyewa
+st.header("Pengaruh Faktor Cuaca terhadap Jumlah Penyewa Sepeda")
 
-# Header utama
-st.markdown("<h1 style='text-align: center; color: blue;'>Dashboard Sepeda </h1>", unsafe_allow_html=True)
+weather_factors = ['temp', 'hum', 'windspeed', 'cnt']
+correlation = day_df[weather_factors].corr()
 
-# KPI Utama
-st.markdown("### Statistik Kinerja Utama")
-col1, col2, col3 = st.columns(3)
+# Plot heatmap korelasi
+plt.figure(figsize=(10, 8))
+sns.heatmap(correlation, annot=True, cmap='coolwarm', vmin=-1, vmax=1, center=0)
+plt.title('Korelasi antara Faktor Cuaca dan Jumlah Penyewa')
+st.pyplot(plt.gcf())
 
-total_rides = day_df['cnt'].sum()
-avg_rides = day_df['cnt'].mean()
-max_rides = day_df['cnt'].max()
+st.markdown("""
+**Interpretasi:**
+- Korelasi antara suhu (temperatur), kelembapan, dan kecepatan angin terhadap jumlah penyewa sepeda.
+- Nilai korelasi antara -1 hingga 1, di mana nilai positif menunjukkan hubungan langsung dan nilai negatif menunjukkan hubungan terbalik.
+""")
 
-with col1:
-    st.metric(label="🚴 Total Perjalanan", value=f"{total_rides:,}")
-with col2:
-    st.metric(label="📊 Rata-rata Harian", value=f"{avg_rides:.2f}")
-with col3:
-    st.metric(label="🌟 Hari Terbaik", value=f"{max_rides:,}")
+# 2. Pola Penyewaan Berdasarkan Waktu
+st.header("Pola Penyewaan Sepeda Berdasarkan Waktu dan Hari")
 
-# Grafik Performa Harian dengan Altair
-st.markdown("### Grafik Performa Harian")
-line_chart = alt.Chart(day_df).mark_line(color='blue').encode(
-    x='dteday:T',
-    y='cnt:Q',
-    tooltip=['dteday:T', 'cnt:Q']
-).properties(
-    title='Total Perjalanan Harian',
-    width=800,
-    height=400
-)
+# Pola Penyewaan Harian (Line Plot)
+daily_pattern = hour_df.groupby('dteday')['cnt'].mean()
 
-st.altair_chart(line_chart, use_container_width=True)
+plt.figure(figsize=(12, 6))
+daily_pattern.plot()
+plt.title('Pola Penyewaan Sepeda Harian')
+plt.xlabel('Tanggal')
+plt.ylabel('Rata-rata Jumlah Penyewa')
+st.pyplot(plt.gcf())
 
-# Filter tambahan untuk menampilkan data berdasarkan rentang tanggal
-if len(date_range) == 2:
-    start_date, end_date = date_range
-    filtered_data = day_df[(day_df['dteday'] >= pd.to_datetime(start_date)) & (day_df['dteday'] <= pd.to_datetime(end_date))]
-    
-    st.markdown("### Data Perjalanan Berdasarkan Rentang Tanggal")
-    st.dataframe(filtered_data)
+st.markdown("""
+**Interpretasi:**
+- Pola penyewaan harian menunjukkan bagaimana rata-rata jumlah penyewa sepeda berubah setiap hari.
+""")
 
-# Grafik cuaca dengan Altair
-st.markdown("### Pengaruh Cuaca Terhadap Jumlah Perjalanan")
-weather_data = day_df[day_df['weathersit'] == weather_filter]
-bar_chart = alt.Chart(weather_data).mark_bar(color='orange').encode(
-    x='dteday:T',
-    y='cnt:Q',
-    tooltip=['dteday:T', 'cnt:Q']
-).properties(
-    title='Jumlah Perjalanan Berdasarkan Cuaca',
-    width=800,
-    height=400
-)
+# Pola Mingguan Berdasarkan Jam dan Hari (Heatmap)
+hourly_weekday = hour_df.pivot_table(values='cnt', index='hr', columns='weekday', aggfunc='mean')
 
-st.altair_chart(bar_chart, use_container_width=True)
+plt.figure(figsize=(12, 8))
+sns.heatmap(hourly_weekday, cmap='YlOrRd', annot=True)
+plt.title('Pola Penyewaan Sepeda berdasarkan Jam dan Hari dalam Seminggu')
+plt.xlabel('Hari (0 = Minggu, 6 = Sabtu)')
+plt.ylabel('Jam')
+st.pyplot(plt.gcf())
 
-# Data Hourly Analysis
-st.markdown("## Analisis Perjalanan Per Jam")
+st.markdown("""
+**Interpretasi:**
+- Heatmap ini menunjukkan pola penyewaan sepeda berdasarkan jam dan hari. Warna yang lebih terang menunjukkan lebih banyak penyewa sepeda.
+- Hari kerja (Senin - Jumat) cenderung memiliki pola penyewaan yang berbeda dengan akhir pekan (Sabtu dan Minggu).
+""")
 
-# Grafik Jumlah Perjalanan Per Jam
-hourly_rides = alt.Chart(hour_df).mark_line(color='green').encode(
-    x='hr:O',  # hr column should represent hours
-    y='cnt:Q',
-    tooltip=['hr:O', 'cnt:Q']
-).properties(
-    title='Jumlah Perjalanan Per Jam',
-    width=800,
-    height=400
-)
-
-st.altair_chart(hourly_rides, use_container_width=True)
+# Jalankan streamlit dengan perintah berikut di terminal:
+# streamlit run nama_file.py
 
